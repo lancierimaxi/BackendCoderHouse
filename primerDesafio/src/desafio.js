@@ -108,6 +108,7 @@ class ProductManager {
 
 // Ejemplo:
 const productManager = new ProductManager('productos.json');
+exports.productManager = productManager;
 
 productManager.addProduct({
   title: "Producto 1",
@@ -147,3 +148,5 @@ console.log(productManager.getProducts());
 productManager.deleteProduct(2);
 
 console.log(productManager.getProducts());
+
+module.exports = productManager;
