@@ -35,7 +35,7 @@ app.get('/products/:pid', async (req, res) => {
   }
 });
 
+const server = app.listen(port, () => {
+    console.log(`Servidor corriendo en http://localhost:${server.address().port}`);
+  });
 
-app.listen(port, () => {
-  console.log(`Servidor corriendo en http://localhost:${port}`);
-});
