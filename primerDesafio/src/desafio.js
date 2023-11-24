@@ -1,152 +1,150 @@
 const fs = require('fs');
+const { v4: uuidv4 } = require('uuid');
 
 class ProductManager {
-  constructor(filePath) {
-    this.path = filePath;
-  }
-
-  addProduct(product) {
-    // Leer productos actuales del archivo
-    let products = this.readProductsFromFile();
-
-    // Validar que todos los campos sean obligatorios
-    if (!product.title || !product.description || !product.price || !product.thumbnail || !product.code || !product.stock) {
-      console.error("Todos los campos son obligatorios.");
-      return;
+    constructor(fileName) {
+      this._filename = fileName;
+      this.init();
     }
-
-    // Validar que no se repita el campo "code"
-    const isCodeUnique = products.every((existingProduct) => existingProduct.code !== product.code);
-    if (!isCodeUnique) {
-      console.error("El código ya existe en otro producto.");
-      return;
-    }
-
-    // Agregar el producto con un ID autoincrementable
-    product.id = this.getNextProductId(products);
-    products.push(product);
-
-    // Guardar los productos en el archivo
-    this.saveProductsToFile(products);
-  }
-
-  getProducts() {
-    return this.readProductsFromFile();
-  }
-
-  getProductById(id) {
-    const products = this.readProductsFromFile();
-    const product = products.find((p) => p.id === id);
-    if (product) {
-      return product;
-    } else {
-      console.error("Producto no encontrado.");
-    }
-  }
-
-  updateProduct(id, updatedProduct) {
-    let products = this.readProductsFromFile();
-    const productIndex = products.findIndex((p) => p.id === id);
-
-    if (productIndex !== -1) {
-      // Actualizar el producto sin cambiar su ID
-      updatedProduct.id = id;
-      products[productIndex] = updatedProduct;
-
-      // Guardar los productos actualizados en el archivo
-      this.saveProductsToFile(products);
-    } else {
-      console.error("Producto no encontrado.");
-    }
-  }
-
-  deleteProduct(id) {
-    let products = this.readProductsFromFile();
-    const productIndex = products.findIndex((p) => p.id === id);
-
-    if (productIndex !== -1) {
-      // Eliminar el producto del array
-      products.splice(productIndex, 1);
-
-      // Guardar los productos actualizados en el archivo
-      this.saveProductsToFile(products);
-    } else {
-      console.error("Producto no encontrado.");
-    }
-  }
-
-  getNextProductId(products) {
-    if (products.length === 0) {
-      return 1;
-    }
-    const ids = products.map((product) => product.id);
-    return Math.max(...ids) + 1;
-  }
-
-  readProductsFromFile() {
-    try {
-      const data = fs.readFileSync(this.path, 'utf-8');
-      if (data) {
-        return JSON.parse(data);
+  
+    async init() {
+      try {
+        await this._readFileOrCreateNewOne();
+      } catch (error) {
+        console.log(
+          `Error code: ${error.code} | There was an unexpected error when trying to initialize ${this._filename}`
+        );
       }
-      return [];
+    }
+  
+    async _readFileOrCreateNewOne() {
+      try {
+        await fs.promises.readFile(this._filename, 'utf-8');
+      } catch (error) {
+        if (error.code === 'ENOENT') {
+          await this._createEmptyFile();
+        } else {
+          console.log(
+            `Error code: ${error.code} | There was an unexpected error when trying to read ${this._filename}`
+          );
+        }
+      }
+    }
+  
+    async _createEmptyFile() {
+      fs.writeFile(this._filename, '[]', (error) => {
+        if (error) {
+          console.log(error);
+        } else {
+          console.log(
+            `File ${this._filename} was created since it didn't exist in the system`
+          );
+        }
+      });
+    }
+  
+
+  async getById(id) {
+    try {
+      const data = await this.getData();
+      const parsedData = JSON.parse(data);
+
+      return parsedData.find((producto) => producto.id === id);
     } catch (error) {
-      console.error("Error al leer el archivo de productos:", error);
-      return [];
+      console.log(
+        `Error Code: ${error.code} | There was an error when trying to get an element by its ID (${id})`
+      );
     }
   }
 
-  saveProductsToFile(products) {
+  async deleteById(id) {
     try {
-      fs.writeFileSync(this.path, JSON.stringify(products, null, 2), 'utf-8');
-      console.log("Productos guardados en el archivo.");
+      const data = await this.getData();
+      const parsedData = JSON.parse(data);
+      const objectIdToBeRemoved = parsedData.find(
+        (producto) => producto.id === id
+      );
+
+      if (objectIdToBeRemoved) {
+        const index = parsedData.indexOf(objectIdToBeRemoved);
+        parsedData.splice(index, 1);
+        await fs.promises.writeFile(
+          this._filename,
+          JSON.stringify(parsedData)
+        );
+      } else {
+        console.log(`ID ${id} does not exist in the file`);
+        return null;
+      }
     } catch (error) {
-      console.error("Error al guardar productos en el archivo:", error);
+      console.log(
+        `Error Code: ${error.code} | There was an error when trying to delete an element by its ID (${id})`
+      );
     }
   }
+
+  async save(object) {
+    try {
+      const allData = await this.getData();
+      const parsedData = JSON.parse(allData);
+
+      object.id = uuidv4();
+      parsedData.push(object);
+
+      await fs.promises.writeFile(
+        this._filename,
+        JSON.stringify(parsedData)
+      );
+      return object.id;
+    } catch (error) {
+      console.log(
+        `Error Code: ${error.code} | There was an error when trying to save an element`
+      );
+    }
+  }
+
+  async save(object) {
+    try {
+      const allData = await this.getData();
+      const parsedData = JSON.parse(allData);
+
+      object.id = uuidv4();
+      parsedData.push(object);
+
+      await fs.promises.writeFile(
+        this._filename,
+        JSON.stringify(parsedData)
+      );
+      return object.id;
+    } catch (error) {
+      console.log(
+        `Error code: ${error.code} | There was an error when trying to save an element`
+      );
+    }
+  }
+
+  async getData() {
+    const data = await fs.promises.readFile(this._filename, 'utf-8');
+    return data;
+  }
+
+  async getAll() {
+    try {
+      const data = await this.getData();
+
+      // Verificar si el archivo está vacío antes de analizar JSON
+      if (!data.trim()) {
+        return [];
+      }
+
+      return JSON.parse(data);
+    } catch (error) {
+      console.log(
+        `Error Code: ${error.code} | There was an error when trying to parse data in getAll`
+      );
+    }
+  }
+
 }
 
-// Ejemplo:
-const productManager = new ProductManager('productos.json');
-exports.productManager = productManager;
-
-productManager.addProduct({
-  title: "Producto 1",
-  description: "Descripción del producto 1",
-  price: 100,
-  thumbnail: "imagen1.jpg",
-  code: "12345",
-  stock: 12,
-});
-
-productManager.addProduct({
-  title: "Producto 2",
-  description: "Descripción del producto 2",
-  price: 200,
-  thumbnail: "imagen2.jpg",
-  code: "54321",
-  stock: 5,
-});
-
-console.log(productManager.getProducts());
-console.log(productManager.getProductById(1));
-console.log(productManager.getProductById(3)); // Debe mostrar un error "Not found"
-
-// Actualizar un producto
-productManager.updateProduct(1, {
-  title: "Producto 1 Actualizado",
-  description: "Descripción actualizada",
-  price: 250,
-  thumbnail: "imagen1_updated.jpg",
-  code: "12345",
-  stock: 15,
-});
-
-console.log(productManager.getProducts());
-
-// Eliminar un producto
-productManager.deleteProduct(2);
-
-console.log(productManager.getProducts());
-
-module.exports = productManager;
+module.exports = ProductManager;
